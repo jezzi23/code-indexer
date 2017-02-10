@@ -9,13 +9,17 @@
 
 #include "file_mapped_io.h"
 
-struct LexingIterator {
-  const char* begin;
-  const char* end;
-  const char* itr;
+internal_ bool
+hasFileExtension(const char* filename, const char* extension);
 
-  const char* last_line_begin;
-  int line_count;
+internal_ void
+eatMeaninglessChars(LexingIterator& lexer);
+
+Token::Token(LexingIterator lex_itr, int identifier, int length) :
+    index(lex_itr.itr - lex_itr.begin),
+    id(identifier),
+    line_count(lex_itr.line_count),
+    column_count(lex_itr.itr - lex_itr.last_line_begin) {
 }
 
 // Temporary check 
@@ -45,9 +49,9 @@ eatMeaninglessChars(LexingIterator& lexer) {
       case '\r': break;
       case ' ': break;
       case '\n': {
-        last_line_begin = lexer.itr;
-        ++lexer.itr;
         ++lexer.line_count;
+        ++lexer.itr;
+        lexer.last_line_begin = lexer.itr;
         break;
       }
       default: return;
@@ -76,11 +80,34 @@ tokenize(const char* filename) {
     eatMeaninglessChars(lexer);
     
     switch (lexer.itr) {
-      case OPEN_PARANTHESIS: {
+      case '(': {
+        out_tokens.push_back(Token(lexer, '(', 1));
+        continue;
+      }
+      case ')': {
+        out_tokens.push_back(Token(lexer, ')', 1));
+        continue;
+      }
+      case '[': {
+        out_tokens.push_back(Token(lexer, '[', 1));
+        continue;
+      }
+      case ']': {
+        out_tokens.push_back(Token(lexer, ']', 1));
+        continue;
+      }
+      case '{': {
+        out_tokens.push_back(Token(lexer, '{', 1));
+        continue;
+      }
+      case '}': {
+        out_tokens.push_back(Token(lexer, '}', 1));
+        continue;
       }
     }
     
   }
-   
-  return std::vector<Token>();
+  out_tokens.push_back(Token(lexer), TokenIdentifier.EOF, 0); 
+
+  return out_tokens;
 }

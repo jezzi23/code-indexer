@@ -6,15 +6,28 @@
 
 #include "types.h"
 
-struct Token {
+struct LexingIterator {
+  const char* begin;
+  const char* end;
+  const char* itr;
+
+  const char* last_line_begin;
+  int line_count;
+}
+
+class Token {
+public:
+  Token(LexingIterator lex_itr, TokenIdentifier id, int length);
+
+private:
   u64 index;
   int length;
-  int id;
+  TokenIdentifier id;
   int line_count;
   int column_count;
 };
 
-enum class TokenType {
+enum class TokenIdentifier {
   OPEN_PARANTHESIS = '(',
   CLOSE_PARANTHESIS = ')',
   OPEN_BRACKET = '{',
@@ -22,7 +35,12 @@ enum class TokenType {
   OPEN_SQUARE_BRACKET = '[',
   CLOSE_SQUARE_BRACKET = ']',
   COMMENT,
-  NAME
+  NAME,
+  LITERAL_STRING,
+  LITERAL_CHAR,
+  LITERAL_INT,
+  LITERAL_FLOAT,
+  EOF
 };
 
 std::vector<Token> tokenize(const char* filename);  
