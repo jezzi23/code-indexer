@@ -51,11 +51,15 @@ FileMapper::FileMapper(const char* file_path) {
     std::cerr << GetLastError() << std::endl;
   }
   //TODO: Can file_handle be closed here?
-  handle = { map_handle, file_size ? 0 : file_fill_size };
+  handle = { map_handle, file_size ? file_size : file_fill_size };
 }
 
 FileMapper::~FileMapper() {
   CloseHandle(handle.file_handle);
+}
+
+u64 FileMapper::getFileSize() {
+  return handle.file_size;
 }
 
 void* FileMapper::map(u64 byte_offset, u32 length) {

@@ -16,6 +16,7 @@ public:
 
   ~FileMapper();
 
+  u64 getFileSize();
   void* map(u64 byte_offset, u32 length);
   void unmap(void* mapped_mem);
 private:
