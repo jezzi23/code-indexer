@@ -8,14 +8,14 @@
 
 struct LexingIterator {
   const char* begin;
-  const char* end;
   const char* itr;
+  const char* end;
 
   const char* last_line_begin;
-  int line_count;
-
   const char* current_token_begin;
-  int current_token_column;
+
+  unsigned int line_count;
+  unsigned int current_token_column;
 };
 
 enum class TokenIdentifier {
@@ -45,6 +45,33 @@ public:
   int column_count;
 };
 
-std::vector<Token> tokenize(const char* filename);  
+std::vector<Token> tokenize(const char* regex);
+
+class Lexer {
+public:
+  // Regex syntax is POSIX EXTENDED.
+  // https://en.wikipedia.org/wiki/Regular_expression#POSIX_basic_and_extended
+  Lexer(const char* regex, const char* input_data, unsigned int input_length);
+
+
+  Token nextToken();
+  void reset();  
+private:
+  LexingIterator lexing_data; 
+  // DFA states
+  void buildDFA(const char* regex);
+  unsigned int estimateNumStates(const char* regex);
+  unsigned int simulateChar(const char letter);
+  bool isFinishState(unsigned int state);
+
+  struct {
+    //dfa_states[0] is start state
+    unsigned int* states[1 << 7];
+    unsigned int* final_states;
+    unsigned int num_states;
+    
+    unsigned int current_state;
+  } dfa;
+};
 
 #endif // LEXER_H_

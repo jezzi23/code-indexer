@@ -65,7 +65,7 @@ nextNCharsExist(LexingIterator lex_itr, int n) {
 
 std::vector<Token>
 tokenize(const char* filename) {
-  if (!hasFileExtension(filename, "cpp")) {
+  if (!hasFileExtension(filename, "c")) {
     std::cout << "Loaded unsupported file format: " << filename << std::endl; 
   }
 
@@ -75,14 +75,12 @@ tokenize(const char* filename) {
   const char* file_begin = static_cast<const char*>(filemap.map(0, file_size));
   const char* file_end   = file_begin + file_size;
 
-  LexingIterator lexer = { file_begin, file_end, file_begin, file_begin - 1, 1 };
+  LexingIterator lexer = {file_begin, file_end, file_begin,
+                          file_begin - 1, file_begin,
+                          1, 1};
   std::vector<Token> out_tokens;
 
   for (; lexer.itr != lexer.end; ++lexer.itr) {
-
-    if (out_tokens.size() == 3004) {
-      int breakm = 5;
-    }
 
     if (isMeaninglessChar(lexer)) continue;
 
@@ -240,4 +238,101 @@ tokenize(const char* filename) {
   }
   return out_tokens;
 }
+
+Lexer::Lexer(const char* regex, const char* lexing_data, unsigned int input_length) :
+    lexing_data{lexing_data, lexing_data,
+                lexing_data + input_length,
+                lexing_data - 1, lexing_data,
+                1, 1} {
+  buildDFA(regex);
+}
+
+Token Lexer::nextToken() {
+
+  while (lexing_data.itr != lexing_data.end) {
+    unsigned int new_state = simulateChar(*lexing_data.itr);
+    if (isFinishState(new_state)) {
+      return Token(lexing_data, TokenIdentifier::END_OF_FILE, 1);
+    }
+    ++lexing_data.itr;
+  }
+  return Token(lexing_data, TokenIdentifier::END_OF_FILE, 0);
+}
+
+unsigned int Lexer::simulateChar(const char letter) {
+  return 0;
+}
+
+bool Lexer::isFinishState(unsigned int state) {
+  return 0;
+}
+
+void Lexer::reset() {
+  lexing_data.itr = lexing_data.begin;
+
+  lexing_data.last_line_begin = lexing_data.begin - 1;
+  lexing_data.current_token_begin = lexing_data.begin;
+
+  lexing_data.line_count = 1;
+  lexing_data.current_token_column = 1;
+}
+
+// TODO: How to deal with |, e.g. (abc)* | bca | cb+
+unsigned int Lexer::estimateNumStates(const char* regex) {
+  unsigned int total_states = 1; // always have start state 
+  
+  for (const char* itr = regex; *itr != '\0'; ++itr) {
+    switch (*itr) {
+      // deal with special metacharacters 
+      case '*': {
+        // don't need a new state for * metacharacter
+        --total_states;
+        continue;
+      }
+      case '+': {
+        
+        continue;
+      }
+      case '[': {
+        // only need one state until we find a matchin ']' 
+        // move the iterator to that position and continue
+        do {
+          ++itr;
+          if (*itr == '\0') {
+            std::cerr << "Bad regular expression: no matching ']' for '['" << std::endl;
+          }
+        } while (*itr != ']');
+        break;
+      }
+      case '\\': {
+        // we escape the next metacharacter so just walk over it by one
+        ++itr;
+      }
+      case '(': {
+        // a group... continue to next character
+        continue;
+      }
+      case ')': {
+        // a closing group... continue to next character
+      }
+      default: {
+        // normal character
+        break;
+      }
+    }
+    ++total_states; 
+  }
+  return total_states; 
+}
+
+void Lexer::buildDFA(const char* regex) {
+  
+  dfa.num_states = estimateNumStates(regex);
+//  dfa.states = operator new(sizeof(*dfa.states) * dfa.num_states);
+  for (const char* itr = regex; *itr != '\0'; ++itr) {
+
+  }
+}
+
+
 
