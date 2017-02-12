@@ -13,18 +13,9 @@ struct LexingIterator {
 
   const char* last_line_begin;
   int line_count;
-}
 
-class Token {
-public:
-  Token(LexingIterator lex_itr, TokenIdentifier id, int length);
-
-private:
-  u64 index;
-  int length;
-  TokenIdentifier id;
-  int line_count;
-  int column_count;
+  const char* current_token_begin;
+  int current_token_column;
 };
 
 enum class TokenIdentifier {
@@ -40,7 +31,18 @@ enum class TokenIdentifier {
   LITERAL_CHAR,
   LITERAL_INT,
   LITERAL_FLOAT,
-  EOF
+  END_OF_FILE
+};
+
+class Token {
+public:
+  Token(LexingIterator lex_itr, TokenIdentifier id, int token_length);
+
+  u64 index;
+  int length;
+  TokenIdentifier id;
+  int line_count;
+  int column_count;
 };
 
 std::vector<Token> tokenize(const char* filename);  
