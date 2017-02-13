@@ -66,7 +66,8 @@ private:
 
   struct {
     //dfa_states[0] is start state
-    unsigned int* states[1 << 7];
+    const unsigned int alphabet_size = 1 << 7;
+    unsigned int* states;
     unsigned int* final_states;
     unsigned int num_states;
     

@@ -328,11 +328,79 @@ unsigned int Lexer::estimateNumStates(const char* regex) {
 void Lexer::buildDFA(const char* regex) {
   
   dfa.num_states = estimateNumStates(regex);
-//  dfa.states = operator new(sizeof(*dfa.states) * dfa.num_states);
-  for (const char* itr = regex; *itr != '\0'; ++itr) {
+  const unsigned int dfa_width = dfa.alphabet_size;
+  dfa.states = static_cast<unsigned int*>(
+      operator new(dfa.num_states * sizeof(*dfa.states) * dfa_width));
+  //TODO: Should 0 be a default garbage state, and start = 1??
+  memset(dfa.states, 0, dfa.num_states * sizeof(*dfa.states) * dfa_width);
+  // dfa.states operates as follows
+  // dfa.states[STATE_NUMBER * dfa_width + INPUT_CHARACTER] = NEW_STATE_NUMBER
 
+  unsigned int current_state = -1;
+  for (const char* itr = regex; *itr != '\0'; ++itr) {
+    ++current_state;
+    assert(current_state != dfa.num_states);
+
+    switch (*itr) {
+      // deal with special metacharacters 
+      case '[': {
+        // only need one state until we find a matchin ']' 
+        // move the iterator to that position and continue
+        const char* look_ahead = ++itr;
+        const char* first_char = itr;
+        while (*look_ahead != ']') {
+          if (*look_ahead == '\0') {
+            std::cerr << "Bad regular expression: no matching ']' for '['" << std::endl;
+          }
+          ++look_ahead;
+        }
+        ++look_ahead;
+        switch (*look_ahead) {
+          // iterate between [...] and write to transition tables
+          case '*': {
+            for (itr = first_char; itr != look_ahead - 1; ++itr) {
+              dfa.states[current_state * dfa_width + *itr] = current_state;  
+            } 
+            break;
+          }  
+          case '+': {
+            for (itr = first_char; itr != look_ahead - 1; ++itr) {
+              unsigned int next_state = current_state + 1;
+              dfa.states[current_state * dfa_width + *itr] = next_state;  
+              dfa.states[next_state * dfa_width + *itr] = next_state;
+            }
+            break;
+          }
+          default: {
+            for (itr = first_char; itr != look_ahead - 1; ++itr) {
+              unsigned int next_state = current_state + 1;
+              dfa.states[current_state * dfa_width + *itr] = next_state;  
+            }
+            break;
+          }
+        }
+        ++itr;
+        break;
+      }
+      case '\\': {
+        // we escape the next metacharacter so just walk over it by one
+        ++itr;
+      }
+      case '(': {
+        // a group... continue to next character
+        continue;
+      }
+      case ')': {
+        // a closing group... continue to next character
+      }
+      default: {
+        unsigned int next_state = current_state + 1;
+        dfa.states[current_state * dfa_width + *itr] = next_state;  
+         
+        // normal character
+        break;
+      }
+    }
   }
 }
-
-
 
