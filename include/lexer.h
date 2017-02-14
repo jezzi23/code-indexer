@@ -3,6 +3,7 @@
 #define LEXER_H_
 
 #include <vector>
+#include <map>
 
 #include "types.h"
 
@@ -12,10 +13,11 @@ struct LexingIterator {
   const char* end;
 
   const char* last_line_begin;
-  const char* current_token_begin;
-
   unsigned int line_count;
-  unsigned int current_token_column;
+
+  const char* token_begin;
+  unsigned int token_line;
+  unsigned int token_column;
 };
 
 enum class TokenIdentifier {
@@ -36,7 +38,8 @@ enum class TokenIdentifier {
 
 class Token {
 public:
-  Token(LexingIterator lex_itr, TokenIdentifier id, int token_length);
+  Token();
+  Token(LexingIterator lex_itr, TokenIdentifier id);
 
   u64 index;
   int length;
@@ -67,11 +70,15 @@ private:
   struct {
     //dfa_states[0] is start state
     const unsigned int alphabet_size = 1 << 7;
+    const unsigned int begin_state = 0;
+
     unsigned int* states;
     unsigned int* final_states;
     unsigned int num_states;
+   
+    // map from state to TokenIdentifier
+    std::map<unsigned int, unsigned int> accept_states;
     
-    unsigned int current_state;
   } dfa;
 };
 

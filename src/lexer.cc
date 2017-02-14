@@ -16,12 +16,16 @@ hasFileExtension(const char* filename, const char* extension);
 internal_ bool
 isMeaninglessChar(LexingIterator& lexer);
 
-Token::Token(LexingIterator lex_itr, TokenIdentifier identifier, int token_length) :
-    index(lex_itr.current_token_begin - lex_itr.begin),
-    length(token_length),
+Token::Token() {
+
+}
+
+Token::Token(LexingIterator lex_itr, TokenIdentifier identifier) :
+    index(lex_itr.token_begin - lex_itr.begin),
+    length((lex_itr.itr - lex_itr.token_begin) + 1),
     id(identifier),
-    line_count(lex_itr.line_count),
-    column_count(lex_itr.current_token_column) {
+    line_count(lex_itr.token_line),
+    column_count(lex_itr.token_column) {
 }
 
 // Temporary check 
@@ -39,8 +43,7 @@ hasFileExtension(const char* filename, const char* extension) {
       ++filename; 
     }
   }
-
-  return static_cast<bool>(!strcmp(filename, extension)); 
+  return !strcmp(filename, extension);
 }
 
 inline bool
@@ -75,53 +78,49 @@ tokenize(const char* filename) {
   const char* file_begin = static_cast<const char*>(filemap.map(0, file_size));
   const char* file_end   = file_begin + file_size;
 
-  LexingIterator lexer = {file_begin, file_end, file_begin,
-                          file_begin - 1, file_begin,
-                          1, 1};
+  LexingIterator lexer = {file_begin, file_begin, file_end,
+                          file_begin - 1, 1,
+                          file_begin, 1, 1};
+
   std::vector<Token> out_tokens;
 
   for (; lexer.itr != lexer.end; ++lexer.itr) {
 
     if (isMeaninglessChar(lexer)) continue;
 
-    lexer.current_token_begin = lexer.itr; 
-    lexer.current_token_column = lexer.itr - lexer.last_line_begin;
+    lexer.token_begin = lexer.itr; 
+    lexer.token_line = lexer.line_count;
+    lexer.token_column = lexer.itr - lexer.last_line_begin;
 
     switch (*lexer.itr) {
       case '(': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::OPEN_PARANTHESIS,
-                                   1));
+                                   TokenIdentifier::OPEN_PARANTHESIS));
         continue;
       }
       case ')': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::CLOSE_PARANTHESIS,
-                                   1));
+                                   TokenIdentifier::CLOSE_PARANTHESIS));
         continue;
       }
       case '[': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::OPEN_SQUARE_BRACKET,
-                                   1));
+                                   TokenIdentifier::OPEN_SQUARE_BRACKET));
         continue;
       }
       case ']': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::CLOSE_SQUARE_BRACKET,
-                                   1));
+                                   TokenIdentifier::CLOSE_SQUARE_BRACKET));
         continue;
       }
       case '{': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::OPEN_BRACKET,
-                                   1));
+                                   TokenIdentifier::OPEN_BRACKET));
         continue;
       }
       case '}': {
         out_tokens.push_back(Token(lexer,
-                                   TokenIdentifier::CLOSE_BRACKET,
-                                   1));
+                                   TokenIdentifier::CLOSE_BRACKET));
         continue;
       }
     }
@@ -136,8 +135,7 @@ tokenize(const char* filename) {
           if (lexer.itr[0] == '*' && nextNCharsExist(lexer, 2) && lexer.itr[1] == '/') {
             ++lexer.itr;
             out_tokens.push_back(Token(lexer,
-                                       TokenIdentifier::COMMENT,
-                                       lexer.itr - lexer.current_token_begin + 1));
+                                       TokenIdentifier::COMMENT));
             break;
           }
         }
@@ -147,8 +145,7 @@ tokenize(const char* filename) {
         while (++lexer.itr != lexer.end) {
           if (*lexer.itr == '\n') {
             out_tokens.push_back(Token(lexer,
-                                       TokenIdentifier::COMMENT,
-                                       lexer.itr - lexer.current_token_begin + 1)); 
+                                       TokenIdentifier::COMMENT)); 
             break;
           }
         }
@@ -162,8 +159,7 @@ tokenize(const char* filename) {
       while (++lexer.itr != lexer.end) {
         if (lexer.itr[0] == '"' && !(lexer.itr[-1] == '\\')) {
           out_tokens.push_back(Token(lexer,
-                                     TokenIdentifier::LITERAL_STRING,
-                                     lexer.itr - lexer.current_token_begin + 1)); 
+                                     TokenIdentifier::LITERAL_STRING)); 
           break;
         }
       }
@@ -176,8 +172,7 @@ tokenize(const char* filename) {
         // Find a matchin ', except for an escaped '
         if (lexer.itr[0] == '\'' && !(lexer.itr[-1] == '\\')) {
           out_tokens.push_back(Token(lexer,
-                                     TokenIdentifier::LITERAL_CHAR,
-                                     lexer.itr - lexer.current_token_begin + 1)); 
+                                     TokenIdentifier::LITERAL_CHAR)); 
           break;
         }
       }
@@ -198,8 +193,7 @@ tokenize(const char* filename) {
       // Number ended
       out_tokens.push_back(
           Token(lexer,
-                is_float ? TokenIdentifier::LITERAL_FLOAT : TokenIdentifier::LITERAL_INT,
-                lexer.itr - lexer.current_token_begin + 1)); 
+                is_float ? TokenIdentifier::LITERAL_FLOAT : TokenIdentifier::LITERAL_INT)); 
       continue;
     }
 
@@ -220,11 +214,10 @@ tokenize(const char* filename) {
 
     --lexer.itr; // back off by one since spaces, newlines etc... is not a part of the word
     out_tokens.push_back(Token(lexer,
-                               TokenIdentifier::NAME,
-                               lexer.itr - lexer.current_token_begin + 1)); 
+                               TokenIdentifier::NAME)); 
   }
 
-  out_tokens.push_back(Token(lexer, TokenIdentifier::END_OF_FILE, 0)); 
+  out_tokens.push_back(Token(lexer, TokenIdentifier::END_OF_FILE)); 
   for (auto itr = out_tokens.begin(); itr != out_tokens.end(); ++itr) {
     printf("Token nr %d.\nIndex: %d\n Length: %d\n id: %d\n line_count: %d\n column_count: %d\n Contents: \n%.*s\n\n",
            (int)(itr - out_tokens.begin()),
@@ -240,41 +233,50 @@ tokenize(const char* filename) {
 }
 
 Lexer::Lexer(const char* regex, const char* lexing_data, unsigned int input_length) :
-    lexing_data{lexing_data, lexing_data,
-                lexing_data + input_length,
-                lexing_data - 1, lexing_data,
-                1, 1} {
+    lexing_data{lexing_data, lexing_data, lexing_data + input_length,
+                lexing_data - 1, 1,
+                lexing_data , 1, 1} {
   buildDFA(regex);
 }
 
-Token Lexer::nextToken() {
+Token
+Lexer::nextToken() {
+  unsigned int state = dfa.begin_state;
 
   while (lexing_data.itr != lexing_data.end) {
-    unsigned int new_state = simulateChar(*lexing_data.itr);
-    if (isFinishState(new_state)) {
-      return Token(lexing_data, TokenIdentifier::END_OF_FILE, 1);
+    if (*lexing_data.itr == '\n') {
+      ++lexing_data.line_count;
+      lexing_data.last_line_begin = lexing_data.itr;
+    }
+    if (state == dfa.begin_state) {
+      // start over
+      lexing_data.token_begin = lexing_data.itr;
+      lexing_data.token_line = lexing_data.line_count;
+      lexing_data.token_column = lexing_data.itr - lexing_data.last_line_begin;
+    }
+
+    state = dfa.states[state * dfa.alphabet_size + (*lexing_data.itr)];
+    if (isFinishState(state)) {
+      return Token(lexing_data, TokenIdentifier::NAME);
     }
     ++lexing_data.itr;
   }
-  return Token(lexing_data, TokenIdentifier::END_OF_FILE, 0);
+  return Token(lexing_data, TokenIdentifier::END_OF_FILE);
 }
 
-unsigned int Lexer::simulateChar(const char letter) {
-  return 0;
+inline bool
+Lexer::isFinishState(unsigned int state) {
+  return dfa.accept_states.find(state) != dfa.accept_states.end();
 }
 
-bool Lexer::isFinishState(unsigned int state) {
-  return 0;
-}
-
-void Lexer::reset() {
+void
+Lexer::reset() {
   lexing_data.itr = lexing_data.begin;
 
   lexing_data.last_line_begin = lexing_data.begin - 1;
-  lexing_data.current_token_begin = lexing_data.begin;
+  lexing_data.token_begin = lexing_data.begin;
 
   lexing_data.line_count = 1;
-  lexing_data.current_token_column = 1;
 }
 
 // TODO: How to deal with |, e.g. (abc)* | bca | cb+
@@ -331,15 +333,20 @@ void Lexer::buildDFA(const char* regex) {
   const unsigned int dfa_width = dfa.alphabet_size;
   dfa.states = static_cast<unsigned int*>(
       operator new(dfa.num_states * sizeof(*dfa.states) * dfa_width));
-  //TODO: Should 0 be a default garbage state, and start = 1??
   memset(dfa.states, 0, dfa.num_states * sizeof(*dfa.states) * dfa_width);
   // dfa.states operates as follows
   // dfa.states[STATE_NUMBER * dfa_width + INPUT_CHARACTER] = NEW_STATE_NUMBER
 
+  std::vector<char> next_transition;
+  next_transition.reserve(128);
+
   unsigned int current_state = -1;
+
   for (const char* itr = regex; *itr != '\0'; ++itr) {
     ++current_state;
     assert(current_state != dfa.num_states);
+
+    next_transition.clear();
 
     switch (*itr) {
       // deal with special metacharacters 
@@ -348,43 +355,61 @@ void Lexer::buildDFA(const char* regex) {
         // move the iterator to that position and continue
         const char* look_ahead = ++itr;
         const char* first_char = itr;
+        bool flip_transition = false;
+        if (*first_char == '^') {
+          flip_transition = true;
+          ++look_ahead;
+          for (char i = 0; i < 128; ++i) {
+            next_transition.push_back(i);
+          }
+        }
+        char last_val = *look_ahead;
         while (*look_ahead != ']') {
-          if (*look_ahead == '\0') {
-            std::cerr << "Bad regular expression: no matching ']' for '['" << std::endl;
+          switch (*look_ahead) {
+            case '\0': {
+              std::cerr << "Bad regular expression: no matching ']' for '['" << std::endl;
+            }
+            case '-': {
+              ++look_ahead;
+              if (*look_ahead == '\\') {
+                ++look_ahead;
+              }
+              char end_val = *look_ahead; 
+              if (end_val < last_val) { 
+                // swap to allow [a-z] to have same semantic meaning as [z-a]
+                char tmp = end_val;
+                end_val = last_val;
+                last_val = tmp;
+              }
+              for (char val = last_val; val <= end_val; ++val) {
+                if (flip_transition) {
+                  next_transition.erase(std::lower_bound(next_transition.begin(),
+                                                         next_transition.end(),
+                                                         val));
+                } else {
+                  next_transition.push_back(val);
+                }
+              }
+            }
+            default: {
+              if (flip_transition) {
+                next_transition.erase(std::lower_bound(next_transition.begin(),
+                                                       next_transition.end(),
+                                                       *look_ahead));
+              } else {
+                next_transition.push_back(*look_ahead);
+              }
+            }
           }
           ++look_ahead;
         }
-        ++look_ahead;
-        switch (*look_ahead) {
-          // iterate between [...] and write to transition tables
-          case '*': {
-            for (itr = first_char; itr != look_ahead - 1; ++itr) {
-              dfa.states[current_state * dfa_width + *itr] = current_state;  
-            } 
-            break;
-          }  
-          case '+': {
-            for (itr = first_char; itr != look_ahead - 1; ++itr) {
-              unsigned int next_state = current_state + 1;
-              dfa.states[current_state * dfa_width + *itr] = next_state;  
-              dfa.states[next_state * dfa_width + *itr] = next_state;
-            }
-            break;
-          }
-          default: {
-            for (itr = first_char; itr != look_ahead - 1; ++itr) {
-              unsigned int next_state = current_state + 1;
-              dfa.states[current_state * dfa_width + *itr] = next_state;  
-            }
-            break;
-          }
-        }
-        ++itr;
+        itr = look_ahead;
         break;
       }
       case '\\': {
         // we escape the next metacharacter so just walk over it by one
         ++itr;
+        // don't break, instead fall down to default
       }
       case '(': {
         // a group... continue to next character
@@ -394,13 +419,46 @@ void Lexer::buildDFA(const char* regex) {
         // a closing group... continue to next character
       }
       default: {
-        unsigned int next_state = current_state + 1;
-        dfa.states[current_state * dfa_width + *itr] = next_state;  
-         
+        next_transition.push_back(*itr);
         // normal character
         break;
       }
     }
+    // we now have collected new state transitions in next_transition
+    // look for '*', '+' etc metacharacters to determine how to write the trasnitions 
+    const char* look_ahead = itr + 1;
+    unsigned int next_state = current_state + 1; 
+    switch (*look_ahead) {
+      case '*': {
+        for (auto char_transition : next_transition) {
+          if (dfa.states[current_state * dfa_width + char_transition] == dfa.begin_state) {
+            dfa.states[current_state * dfa_width + char_transition] = current_state;
+          }
+        }
+        itr = look_ahead;
+        break;
+      }
+      case '+':  {
+        for (auto char_transition : next_transition) {
+          if (dfa.states[current_state * dfa_width + char_transition] == dfa.begin_state) {
+            dfa.states[current_state * dfa_width + char_transition] = next_state;
+            dfa.states[next_state * dfa_width + char_transition] = next_state;
+            
+          }
+        }
+        itr = look_ahead;
+        break;
+      }
+      default: {
+        for (auto char_transition : next_transition) {
+          if (dfa.states[current_state * dfa_width + char_transition] == dfa.begin_state) {
+            dfa.states[current_state * dfa_width + char_transition] = next_state;
+          }
+        }
+        break;
+      }
+    }
   }
+  dfa.accept_states.insert(std::pair<unsigned int, unsigned int>(current_state + 1, 0));
 }
 
