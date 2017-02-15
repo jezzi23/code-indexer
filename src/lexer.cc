@@ -22,7 +22,7 @@ Token::Token() {
 
 Token::Token(LexingIterator lex_itr, TokenIdentifier identifier) :
     index(lex_itr.token_begin - lex_itr.begin),
-    length((lex_itr.itr - lex_itr.token_begin) + 1),
+    length(lex_itr.itr - lex_itr.token_begin),
     id(identifier),
     line_count(lex_itr.token_line),
     column_count(lex_itr.token_column) {
@@ -254,12 +254,14 @@ Lexer::nextToken() {
       lexing_data.token_line = lexing_data.line_count;
       lexing_data.token_column = lexing_data.itr - lexing_data.last_line_begin;
     }
-
     state = dfa.states[state * dfa.alphabet_size + (*lexing_data.itr)];
+    ++lexing_data.itr;
+    if (state != 0) {
+      int breakme = 5;
+    }
     if (isFinishState(state)) {
       return Token(lexing_data, TokenIdentifier::NAME);
     }
-    ++lexing_data.itr;
   }
   return Token(lexing_data, TokenIdentifier::END_OF_FILE);
 }
@@ -280,7 +282,8 @@ Lexer::reset() {
 }
 
 // TODO: How to deal with |, e.g. (abc)* | bca | cb+
-unsigned int Lexer::estimateNumStates(const char* regex) {
+unsigned int
+Lexer::estimateNumStates(const char* regex) {
   unsigned int total_states = 1; // always have start state 
   
   for (const char* itr = regex; *itr != '\0'; ++itr) {
@@ -340,10 +343,12 @@ void Lexer::buildDFA(const char* regex) {
   std::vector<char> next_transition;
   next_transition.reserve(128);
 
-  unsigned int current_state = -1;
+  unsigned int current_state;
+  unsigned int next_state = 0;
 
   for (const char* itr = regex; *itr != '\0'; ++itr) {
-    ++current_state;
+    current_state = next_state;
+
     assert(current_state != dfa.num_states);
 
     next_transition.clear();
@@ -359,11 +364,13 @@ void Lexer::buildDFA(const char* regex) {
         if (*first_char == '^') {
           flip_transition = true;
           ++look_ahead;
-          for (char i = 0; i < 128; ++i) {
+          for (unsigned char i = 0; i < 128; ++i) {
             next_transition.push_back(i);
           }
         }
-        char last_val = *look_ahead;
+        // buffer the first value in case we see range based expression
+        // e.g. [A-Z], store 'A' in first_val buffer
+        char first_val;
         while (*look_ahead != ']') {
           switch (*look_ahead) {
             case '\0': {
@@ -375,13 +382,13 @@ void Lexer::buildDFA(const char* regex) {
                 ++look_ahead;
               }
               char end_val = *look_ahead; 
-              if (end_val < last_val) { 
+              if (end_val < first_val) { 
                 // swap to allow [a-z] to have same semantic meaning as [z-a]
                 char tmp = end_val;
-                end_val = last_val;
-                last_val = tmp;
+                end_val = first_val;
+                first_val = tmp;
               }
-              for (char val = last_val; val <= end_val; ++val) {
+              for (char val = first_val; val <= end_val; ++val) {
                 if (flip_transition) {
                   next_transition.erase(std::lower_bound(next_transition.begin(),
                                                          next_transition.end(),
@@ -390,14 +397,16 @@ void Lexer::buildDFA(const char* regex) {
                   next_transition.push_back(val);
                 }
               }
+              break;
             }
             default: {
+              first_val = *look_ahead;
               if (flip_transition) {
                 next_transition.erase(std::lower_bound(next_transition.begin(),
                                                        next_transition.end(),
-                                                       *look_ahead));
+                                                       first_val));
               } else {
-                next_transition.push_back(*look_ahead);
+                next_transition.push_back(first_val);
               }
             }
           }
@@ -427,7 +436,6 @@ void Lexer::buildDFA(const char* regex) {
     // we now have collected new state transitions in next_transition
     // look for '*', '+' etc metacharacters to determine how to write the trasnitions 
     const char* look_ahead = itr + 1;
-    unsigned int next_state = current_state + 1; 
     switch (*look_ahead) {
       case '*': {
         for (auto char_transition : next_transition) {
@@ -439,6 +447,7 @@ void Lexer::buildDFA(const char* regex) {
         break;
       }
       case '+':  {
+        next_state = current_state + 1;
         for (auto char_transition : next_transition) {
           if (dfa.states[current_state * dfa_width + char_transition] == dfa.begin_state) {
             dfa.states[current_state * dfa_width + char_transition] = next_state;
@@ -450,6 +459,7 @@ void Lexer::buildDFA(const char* regex) {
         break;
       }
       default: {
+        next_state = current_state + 1;
         for (auto char_transition : next_transition) {
           if (dfa.states[current_state * dfa_width + char_transition] == dfa.begin_state) {
             dfa.states[current_state * dfa_width + char_transition] = next_state;
@@ -459,6 +469,6 @@ void Lexer::buildDFA(const char* regex) {
       }
     }
   }
-  dfa.accept_states.insert(std::pair<unsigned int, unsigned int>(current_state + 1, 0));
+  dfa.accept_states.insert(std::pair<unsigned int, unsigned int>(next_state, 0));
 }
 
