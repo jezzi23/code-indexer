@@ -6,6 +6,8 @@
 #include <map>
 
 #include "types.h"
+#include "nfa.h"
+#include "dfa.h"
 
 struct LexingIterator {
   const char* begin;
@@ -20,6 +22,7 @@ struct LexingIterator {
   unsigned int token_column;
 };
 
+/*
 enum TokenIdentifier : int {
   OPEN_PARANTHESIS = '(',
   CLOSE_PARANTHESIS = ')',
@@ -35,6 +38,7 @@ enum TokenIdentifier : int {
   LITERAL_FLOAT,
   END_OF_FILE
 };
+*/
 
 class Token {
 public:
@@ -66,14 +70,19 @@ private:
   LexingIterator lexing_data; 
   // DFA states
   // Order of rules added impact priority
-  unsigned int estimateNumStates(const char* regex);
   unsigned int simulateChar(const char letter);
 
+  enum class LexingState : u8 {
+    INITIALIZATION_PHASE,
+    BUILD_PHASE,
+    QUERY_PHASE
+  } status;
+
   // Lexer internally constructs NFA during build phase
-  // which gets replaced with a DNA for lexing phase.
+  // which gets replaced with a DFA for lexing phase.
   union {
-    DFA* dfa;
-    NFA* nfa;
+    DFA<unsigned int, int, 1 << 7>* dfa;
+    NFA<unsigned int, int, 1 << 7>* nfa;
   };
 };
 
