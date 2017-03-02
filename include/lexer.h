@@ -8,6 +8,20 @@
 #include "nfa.h"
 #include "dfa.h"
 
+// The regular expression documentation used by the lexer can be found in regex.h
+// 
+// When adding multiple tokenize rules to the lexer, there will likely be conflicts
+// which have to be solved by two rules in the particular order:
+//  
+//  1) The longest possible matching token will be chosen.
+//     Example: [0-9]+ expression on content "51262" will match the whole sequence
+//              instead of "5", "1", ..., "2".
+//
+//  2) The token for a rule added earlier to the lexing ruleset will be chosen.
+//
+// Note: 2) Only applies when there is a match of the same length for multiple
+//          tokenize rules at the 
+
 struct LexingIterator {
   const char* begin;
   const char* itr;
@@ -35,8 +49,6 @@ public:
 
 class Lexer {
 public:
-  // Regex syntax is POSIX EXTENDED.
-  // https://en.wikipedia.org/wiki/Regular_expression#POSIX_basic_and_extended
   Lexer(const char* input_data_begin, const char* input_data_end);
   ~Lexer();
   
