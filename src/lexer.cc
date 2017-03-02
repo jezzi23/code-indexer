@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include "file_mapped_io.h"
+#include "regex_quantification.h"
 #include "finite_automata.h"
 #include "utils.h"
 

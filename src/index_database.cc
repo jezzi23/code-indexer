@@ -1,7 +1,6 @@
 
 #include "index_database.h"
 
-
 DataBase::DataBase(const char* file_path) : file_mapper(file_path) {
   load();
 }
@@ -17,4 +16,3 @@ void DataBase::load() {
 void DataBase::release() {
   file_mapper.unmap(file_begin);
 }
-

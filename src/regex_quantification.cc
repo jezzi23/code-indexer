@@ -1,8 +1,10 @@
 
-#include "nfa.h"
+#include "regex_quantification.h"
 
 #include <cassert>
 #include <cerrno>
+#include <cstring>
+#include <cstdlib>
 
 #include "types.h"
 
