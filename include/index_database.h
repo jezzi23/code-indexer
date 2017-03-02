@@ -3,20 +3,7 @@
 
 #include <cassert>
 
-// TODO: This is error prone. 
-//       Maintain HeaderData using something like __COUNTER__ to manage
-//       the offsets consistently using the size of the HeaderData?
-//       E.g.
-//enum HeaderData {
-//  FILE_INDENTIFIER = INCREASING_OFFSET(sizeof(u32)),
-//  DATABASE_VERSION = INCREASING_OFFSET(sizeof(u32)),
-//  FILES_COUNT      = INCREASING_OFFSET(sizeof(u32)),
-//
-//  TEST_COUNT       = INCREASING_OFFSET(sizeof(u64)),
-//  NUMS_OFFSET      = INCREASING_OFFSET(sizeof(u64)),
-//  etc...
-//};
-//
+// TODO: Better to pack header info into a struct and memcpy
 enum HeaderData {
   FILE_INDENTIFIER = 0x0, // 4 bytes
   DATABASE_VERSION = 0x4, // 4 bytes

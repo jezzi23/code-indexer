@@ -3,7 +3,6 @@
 #define LEXER_H_
 
 #include <vector>
-#include <map>
 
 #include "types.h"
 #include "nfa.h"
@@ -22,24 +21,6 @@ struct LexingIterator {
   unsigned int token_column;
 };
 
-/*
-enum TokenIdentifier : int {
-  OPEN_PARANTHESIS = '(',
-  CLOSE_PARANTHESIS = ')',
-  OPEN_BRACKET = '{',
-  CLOSE_BRACKET = '}',
-  OPEN_SQUARE_BRACKET = '[',
-  CLOSE_SQUARE_BRACKET = ']',
-  COMMENT,
-  NAME,
-  LITERAL_STRING,
-  LITERAL_CHAR,
-  LITERAL_INT,
-  LITERAL_FLOAT,
-  END_OF_FILE
-};
-*/
-
 class Token {
 public:
   Token();
@@ -52,8 +33,6 @@ public:
   int column_count;
 };
 
-//std::vector<Token> tokenize(const char* regex);
-
 class Lexer {
 public:
   // Regex syntax is POSIX EXTENDED.
@@ -61,7 +40,7 @@ public:
   Lexer(const char* input_data_begin, const char* input_data_end);
   ~Lexer();
   
-  void addRule(const char* regex, int token_id);
+  void addRule(const Regexpr regexpr, int token_id);
   void build();
 
   Token nextToken();

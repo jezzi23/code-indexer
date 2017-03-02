@@ -1,5 +1,5 @@
 
-#include "regex_quantification.h"
+#include "regex.h"
 
 #include <cassert>
 #include <cerrno>
@@ -7,6 +7,11 @@
 #include <cstdlib>
 
 #include "types.h"
+
+Regexpr::Regexpr(const char* regex) : expr_begin(regex), 
+                                      expr_end(regex + strlen(regex)) {
+
+}
 
 ExpressionGroupQuantification::ExpressionGroupQuantification(int min, int max) :
     min_occurrences(min), max_occurrences(max) {

@@ -2,7 +2,7 @@
 #include <vector>
 
 #include "finite_automata.h"
-#include "regex_quantification.h"
+#include "regex.h"
 
 template <typename S, typename T, size_t a_size>
 class NFA : private FiniteAutomata<S, T, a_size> {

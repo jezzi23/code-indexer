@@ -1,16 +1,13 @@
 
 #include "lexer.h"
 
-#include <regex>
 #include <cstring>
-#include <cerrno>
 #include <vector>
 #include <iostream>
 #include <cassert>
-#include <stdio.h>
 
 #include "file_mapped_io.h"
-#include "regex_quantification.h"
+#include "regex.h"
 #include "finite_automata.h"
 #include "utils.h"
 
@@ -48,17 +45,20 @@ Lexer::~Lexer() {
 }
 
 void
-Lexer::addRule(const char* regex, int token_id) {
+Lexer::addRule(const Regexpr regexpr, int token_id) {
   if (status == LexingState::INITIALIZATION_PHASE) {
     status = LexingState::BUILD_PHASE;
     nfa = new NFA<unsigned int, int, 1<<7>;
   }
   assert(status == LexingState::BUILD_PHASE);
-  std::vector<unsigned int> tokenized_states = nfa->addExprGroup(regex,
-                    regex + strlen(regex),
-                    std::vector<unsigned int>{nfa->begin_state},
-                    nfa->begin_state,
-                    ExpressionGroupQuantification(1, 1));
+
+  std::vector<unsigned int> tokenized_states =
+    nfa->addExprGroup(regexpr.expr_begin,
+                      regexpr.expr_end,
+                      std::vector<unsigned int>{nfa->begin_state},
+                      nfa->begin_state,
+                      ExpressionGroupQuantification(1, 1));
+
   bool already_contains_token_higher_prio = false;
   for (auto final_state : tokenized_states) {
 	  if (nfa->stateType(final_state) != 0) {
