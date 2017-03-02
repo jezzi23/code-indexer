@@ -47,8 +47,6 @@ public:
 private:
   inline void writeTransition(S out_state, S in_state, char in_ch);
 
-  
-
   void addEpsilonTransition(S out_state, S in_state);
   
   S makeState();
@@ -58,9 +56,6 @@ private:
 
   std::vector<S>* epsilon_transitions;
 };
-
-
-
 
 //NFA TEMPLATE DEFINTIONS
 
@@ -143,30 +138,30 @@ NFA<S, T, a_size>::makeState() {
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::grow() {
-    const size_t new_max = 2 * num_states_max;
+  num_states_max <<= 1;
 
-    S (*new_transition_table)[a_size] =
-      static_cast<S(*)[a_size]>(operator new(new_max * sizeof(*new_transition_table)));
+  S (*new_transition_table)[a_size] =
+    static_cast<S(*)[a_size]>(operator new(num_states_max * sizeof(*new_transition_table)));
 
-    T* new_accept_states =
-      static_cast<T*>(operator new(new_max * sizeof(*new_accept_states)));
+  T* new_accept_states =
+    static_cast<T*>(operator new(num_states_max * sizeof(*new_accept_states)));
 
-    std::vector<S>* new_epsilon_transitions =
-      static_cast<std::vector<S>*>(operator new(new_max * sizeof(*new_epsilon_transitions)));
-    
-    memcpy(new_transition_table, transition_table, sizeof(*transition_table) * num_states);
-    memcpy(new_accept_states, accept_states, sizeof(*transition_table) * num_states);
-    memcpy(new_epsilon_transitions, epsilon_transitions, sizeof(*epsilon_transitions) * num_states);
+  std::vector<S>* new_epsilon_transitions =
+    static_cast<std::vector<S>*>(operator new(num_states_max * sizeof(*new_epsilon_transitions)));
+  
+  memcpy(new_transition_table, transition_table, sizeof(*transition_table) * num_states);
+  memcpy(new_accept_states, accept_states, sizeof(*accept_states) * num_states);
+  memcpy(new_epsilon_transitions, epsilon_transitions, sizeof(*epsilon_transitions) * num_states);
 
-    operator delete(transition_table);
-    operator delete(accept_states);
-    operator delete(epsilon_transitions);
-    
-    transition_table = new_transition_table;
-    accept_states = new_accept_states;
-    epsilon_transitions = new_epsilon_transitions;
+  operator delete(transition_table);
+  operator delete(accept_states);
+  operator delete(epsilon_transitions);
+  
+  transition_table = new_transition_table;
+  accept_states = new_accept_states;
+  epsilon_transitions = new_epsilon_transitions;
 
-    writeUnusedDefaultTransitions();
+  writeUnusedDefaultTransitions();
 }
 
 template <typename S, typename T, size_t a_size>
@@ -186,7 +181,7 @@ std::vector<S>
 NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
                   const char* regex_group_end,
                   std::vector<S> start_state_set,
-                  S write_state, // a single state, led by epsilon branches on collisions
+                  S start_write_state, // a single state, led by epsilon branches on collisions
                   ExpressionGroupQuantification grp_quantification) {
   //  [regex_begin ; regex_end[ is a complete sub expression to be simulated into start_state_set
   //  The expression can contain children sub expression(s). Groups are seperated from
@@ -202,20 +197,23 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
 
   std::vector<S> next_state_set = start_state_set;
 
+  S write_state = start_write_state;
+
   // The state set where the cycle begins, for e.g. *, +, or {n,m}
   S              cycle_state;
   std::vector<S> cycle_connectivity_state_set;
   std::vector<S> group_final_state_set;
 
+  bool transition_buffer[a_size];
   bool last_group_in_expr;
 
-  bool transition_buffer[a_size];
   //TODO: Figure out correct loop patterns. for {0, ~} - {5, 7} etc
   for (int occurrence_count = 0;
 
-       occurrence_count < grp_quantification.min_occurrences ||
-       occurrence_count < grp_quantification.max_occurrences ||
-       grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES;
+       (occurrence_count < grp_quantification.min_occurrences ||
+       occurrence_count < grp_quantification.max_occurrences) ||
+       (occurrence_count == grp_quantification.min_occurrences &&
+       grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES);
 
        ++occurrence_count) {
 
@@ -229,26 +227,29 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
       }
     }
 
+    last_group_in_expr = false;
+
     for (const char* regex_itr = regex_group_begin;
-         regex_itr != regex_group_end;
-         ++regex_itr) {
+         regex_itr != regex_group_end; // regex_itr incremented in loop by various rule
+         ) {
 
       memset(transition_buffer, 0, sizeof(transition_buffer));
-	  // epsilon branch before moving?
+
       current_state_set = std::move(next_state_set);
       next_state_set = std::vector<S>();
 
-      if (regex_itr + 1 == regex_group_end) {
-        last_group_in_expr = true;
-      }
+      const char* subexpr_group_begin;
+      const char* subexpr_group_end;
 
       switch (*regex_itr) {
         
         case '\\': {
           // we escape the next metacharacter so just walk over it by one
           // and interpret it as a char value
+          subexpr_group_begin = regex_itr;
           ++regex_itr;
           transition_buffer[*regex_itr] = true;
+          regex_itr = subexpr_group_end = regex_itr + 1;
           break;
         }
         case '(': {
@@ -257,7 +258,7 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
           
           // find matching ')' on same depth (nested) level.  
           ++regex_itr;
-          const char* sub_expr_begin = regex_itr;
+          subexpr_group_begin = regex_itr;
 
           for (int depth = 1;
                depth != 0;
@@ -281,44 +282,36 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
               }
             }
           }
-          --regex_itr;
 
-          ExpressionGroupQuantification quantification;
-          int quantification_length = quantification.quantifyOnString(regex_itr + 1);
-
-          next_state_set = addExprGroup(sub_expr_begin,
-                                        regex_itr,
-                                        current_state_set,
-                                        write_state,
-                                        quantification);
-
-          regex_itr += quantification_length;
-          write_state = next_state_set[0];
-          continue;
+          subexpr_group_end = regex_itr - 1;
+          break;
         }
         case ')': {
           std::cerr << "Bad regular expression: no matching '(' for ')'" << std::endl;
           break;
         }
         case '|': {
-          //TODO: Save current final states, and continue from here with start state
           for (S final_state : current_state_set) {
             group_final_state_set.push_back(final_state);
           }
           next_state_set = start_state_set;
+          write_state = start_write_state;
 
+          ++regex_itr;
           continue;
         }
         case '[': {
           // only need one state until we find a matchin ']' 
           // move the iterator to that position and continue
+          subexpr_group_begin = regex_itr;
           const char* look_ahead = regex_itr + 1;
           const char* first_char = look_ahead;
+          
           bool flip_transition = false;
           if (*look_ahead == '^') {
             flip_transition = true;
             ++look_ahead;
-            memset(transition_buffer, true, *transition_buffer);
+            memset(transition_buffer, true, sizeof(transition_buffer));
           }
           // buffer the first value in case we see range based expression
           // e.g. [A-Z], store 'A' in first_val buffer
@@ -358,95 +351,82 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
             }
             ++look_ahead;
           }
-          regex_itr = look_ahead;
+          subexpr_group_end = regex_itr = look_ahead + 1;
           break;
         }
         case '.': {
           // can match any character
-          ExpressionGroupQuantification quantification_check;
-          int quantification_length = quantification_check.quantifyOnString(regex_itr + 1);
-          if (quantification_length == 0 || regex_itr + 1 == regex_group_end) {
-            memset(transition_buffer, true, sizeof(transition_buffer));
-            break;
-          } else {
-            next_state_set = addExprGroup(regex_itr,
-                                          regex_itr + 1,
-                                          current_state_set,
-                                          write_state,
-                                          quantification_check);
-            regex_itr += quantification_length;
-            write_state = next_state_set[0];
-            continue;
-          }
+          subexpr_group_begin = regex_itr;
+          subexpr_group_end = ++regex_itr;
+          memset(transition_buffer, true, sizeof(transition_buffer));
         }
         default: {
-          // Normal character. Look ahead character quantification (e.g. a*, a+ ,a?, a{n,m}
-          
-          ExpressionGroupQuantification quantification_check;
-          int quantification_length = quantification_check.quantifyOnString(regex_itr + 1);
-          if (quantification_length == 0 || regex_itr + 1 == regex_group_end) {
-            transition_buffer[*regex_itr] = true;
+          subexpr_group_begin = regex_itr;
+          transition_buffer[*regex_itr] = true;
+          subexpr_group_end = ++regex_itr;
+          break;
+        }
+      }
+
+      ExpressionGroupQuantification quant;
+      int quantification_length = quant.quantifyOnString(regex_itr);
+
+      // Recursive call on a grouped subexpression
+      if (quantification_length != 0 && regex_itr != regex_group_end) {
+        next_state_set = addExprGroup(subexpr_group_begin,
+                                      subexpr_group_end,
+                                      current_state_set,
+                                      write_state,
+                                      quant);
+
+        regex_itr += quantification_length;
+        write_state = next_state_set[0];
+      }
+      else { // Otherwise do ordinary state transition writes
+
+        bool reusable_existing_state = true;
+        for (unsigned char i = 0;
+        i < a_size;
+          ++i) {
+
+          if (transition_buffer[i] && transition(write_state, i) != garbage_state) {
+            reusable_existing_state = false;
             break;
-          } else {
-            next_state_set = addExprGroup(regex_itr,
-                                          regex_itr + 1,
-                                          current_state_set,
-                                          write_state,
-                                          quantification_check);
-            regex_itr += quantification_length;
-            write_state = next_state_set[0];
-            continue;
           }
         }
-      }
 
-      // State transitions writes
-	  
-      bool reusable_existing_state = true;
-      S first_peek = garbage_state;
-      for (unsigned char i = 0;
-         i < a_size;
-         ++i) { 
-        if (transition_buffer[i]) {
-          if (first_peek == garbage_state) {
-            first_peek = transition(write_state, i);
-          } else {
-            if (first_peek != transition(write_state, i)) {
-              reusable_existing_state = false;
-              break;
-            }
-          }
+        if (!reusable_existing_state) {
+          S epsilon_state = makeState();
+          addEpsilonTransition(epsilon_state, write_state);
+          write_state = epsilon_state;
         }
-      }
-      
-      if (!reusable_existing_state) {
-        S epsilon_state = makeState();
-        addEpsilonTransition(epsilon_state, write_state);
-        write_state = epsilon_state;
-      }
 
-	    S target_state = makeState();
-	    
+        S target_state = makeState();
+
         // write_state is now collision free and transitions can be written to target_state
-      for (unsigned char i = 0;
-           i < a_size;
-           ++i) { 
+        for (unsigned char i = 0;
+        i < a_size;
+          ++i) {
 
-        if (transition_buffer[i]) {
-          writeTransition(target_state, write_state, i);
+          if (transition_buffer[i]) {
+            writeTransition(target_state, write_state, i);
+          }
         }
+
+        next_state_set.push_back(target_state);
+        write_state = target_state;
       }
 
-      next_state_set.push_back(target_state);
-      write_state = target_state;
+      if (regex_itr == regex_group_end || *regex_itr == '|') {
+        last_group_in_expr = true;
+      }
 
       if (last_group_in_expr &&
           occurrence_count == grp_quantification.min_occurrences &&
           grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES)  {
         // add epsilon transition to the previous cycle write state
         addEpsilonTransition(cycle_state, write_state);
-        next_state_set.push_back(cycle_state);
-        grp_quantification.max_occurrences = occurrence_count; // to break out of the outer loop
+        group_final_state_set.push_back(cycle_state);
       } else if (last_group_in_expr &&
           occurrence_count >= grp_quantification.min_occurrences) {
         // next_state_set are accept states
@@ -469,11 +449,25 @@ std::vector<S>
 NFA<S, T, a_size>::epsilonSearch(std::vector<S>& base_states) {
   std::vector<S> expanded_states; 
 
+  
   for (auto state : base_states) {
+    expanded_states.push_back(state);
+  }
+  for (auto state : base_states) {
+    /*
+    Why is dereferencing epsilon_transitions[state] through foreach an error...?!
     for (auto epsilson_state : epsilon_transitions[state]) {
       expanded_states.push_back(epsilson_state);
     }
-    expanded_states.push_back(state);
+    */
+    const size_t n = epsilon_transitions[state].size();
+    for (size_t i = 0; i < n; ++i) {
+      S transition = epsilon_transitions[state][i];
+      if (std::find(expanded_states.begin(), expanded_states.end(), transition) ==
+          expanded_states.end()) {
+        expanded_states.push_back(transition);
+      }
+    }
   }
   return expanded_states;
 }

@@ -46,7 +46,6 @@ Lexer::~Lexer() {
   }
 }
 
-
 void
 Lexer::addRule(const char* regex, int token_id) {
   if (status == LexingState::INITIALIZATION_PHASE) {
@@ -61,14 +60,14 @@ Lexer::addRule(const char* regex, int token_id) {
                     ExpressionGroupQuantification(1, 1));
   bool already_contains_token_higher_prio = false;
   for (auto final_state : tokenized_states) {
-	if (nfa->stateType(final_state) != 0) {
-	  already_contains_token_higher_prio = true;
-	}
+	  if (nfa->stateType(final_state) != 0) {
+	    already_contains_token_higher_prio = true;
+	  }
   }
   if (!already_contains_token_higher_prio) {
-	for (auto final_state : tokenized_states) {
-	  nfa->writeStateType(final_state, token_id);
-	}
+	  for (auto final_state : tokenized_states) {
+	    nfa->writeStateType(final_state, token_id);
+	  }
   }
 }
 
@@ -125,6 +124,9 @@ Lexer::nextToken() {
       ++lexing_data.line_count;
       lexing_data.last_line_begin = lexing_data.itr;
     }
+	if (isdigit(*lexing_data.itr)) {
+		int breakme = 5;
+	}
     // branch out before to all epsilon transitions stored in current_state_set
     current_state_set = nfa->epsilonSearch(current_state_set);
     std::vector<unsigned int> next_state_set;
@@ -136,7 +138,9 @@ Lexer::nextToken() {
     }
     // branch out after
     current_state_set = nfa->epsilonSearch(next_state_set);
-
+    if (*lexing_data.itr == '*') {
+      int breakme = 5;
+    }
     ++lexing_data.itr;
 
     bool is_non_garbage_set = false;
