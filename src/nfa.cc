@@ -61,10 +61,10 @@ ExpressionGroupQuantification::quantifyOnString(const char* quantifier_begin) {
           if (errno == ERANGE && parsed_num_length != 0) {
             // strtol failed because atoi_buffer is not a valid number as a string
             // "" string of length 0 is allowed for default values
-            return 0;
+            return 0; 
           }
           memset(atoi_buffer, 0, parsed_num_length); // reset buffer
-
+          num_begin = quantifier_itr + 1; // next number would begin afterwards
           switch (*quantifier_itr) {
             case '}': {
               assert(num_count >= 1 && num_count <= 2);
@@ -77,9 +77,15 @@ ExpressionGroupQuantification::quantifyOnString(const char* quantifier_begin) {
                   max_occurrences = min_occurrences = num_val;
                 }
               } else {
-                // we are looking at {n,m} where n or m can be empty ""
-                // and m is the value num_val
-                max_occurrences = num_val;
+                if (parsed_num_length == 0) {
+                  max_occurrences = INFINITE_OCCURRENCES;
+                }
+                else {
+                  // we are looking at {n,m} where n or m can be empty ""
+                  // and m is the value num_val
+                  max_occurrences = num_val;
+                }
+                
               }
               // returns how far we looked for a quantification
               // e.g. {502,612} would return 9

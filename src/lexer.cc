@@ -138,7 +138,7 @@ Lexer::nextToken() {
     }
     // branch out after
     current_state_set = nfa->epsilonSearch(next_state_set);
-    if (*lexing_data.itr == '*') {
+    if (*lexing_data.itr == 'f') {
       int breakme = 5;
     }
     ++lexing_data.itr;

@@ -196,16 +196,15 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
   S              current_governing_state = garbage_state;
 
   std::vector<S> next_state_set = start_state_set;
-
+  
   S write_state = start_write_state;
-
+  S intermediate_state = garbage_state;
   // The state set where the cycle begins, for e.g. *, +, or {n,m}
-  S              cycle_state;
-  std::vector<S> cycle_connectivity_state_set;
   std::vector<S> group_final_state_set;
 
   bool transition_buffer[a_size];
   bool last_group_in_expr;
+  bool non_qualified_group;
 
   //TODO: Figure out correct loop patterns. for {0, ~} - {5, 7} etc
   for (int occurrence_count = 0;
@@ -217,29 +216,35 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
 
        ++occurrence_count) {
 
+    if (intermediate_state != garbage_state) {
+      write_state = intermediate_state;
+    }
+    intermediate_state = garbage_state;
+
+    last_group_in_expr = false;
+
     if (occurrence_count == grp_quantification.min_occurrences &&
 		grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES) {
       // For '+', '*' and '{n,} expression type
       // The current state set will be used for cycle connectivity
-      cycle_state = write_state;
-      for (auto accept_state : next_state_set) {
-        group_final_state_set.push_back(accept_state);
-      }
+      intermediate_state = write_state;
+    } else if (occurrence_count >= grp_quantification.min_occurrences) {
+      group_final_state_set.push_back(write_state);
     }
-
-    last_group_in_expr = false;
-
+    
     for (const char* regex_itr = regex_group_begin;
          regex_itr != regex_group_end; // regex_itr incremented in loop by various rule
          ) {
 
       memset(transition_buffer, 0, sizeof(transition_buffer));
+      non_qualified_group = false;
 
       current_state_set = std::move(next_state_set);
       next_state_set = std::vector<S>();
 
-      const char* subexpr_group_begin;
-      const char* subexpr_group_end;
+      const char* subexpr_group_begin = nullptr;
+      const char* subexpr_group_end   = nullptr;
+
 
       switch (*regex_itr) {
         
@@ -282,7 +287,7 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
               }
             }
           }
-
+          non_qualified_group = true;
           subexpr_group_end = regex_itr - 1;
           break;
         }
@@ -291,12 +296,9 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
           break;
         }
         case '|': {
-          for (S final_state : current_state_set) {
-            group_final_state_set.push_back(final_state);
-          }
           next_state_set = start_state_set;
           write_state = start_write_state;
-
+          last_group_in_expr = false;
           ++regex_itr;
           continue;
         }
@@ -359,6 +361,7 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
           subexpr_group_begin = regex_itr;
           subexpr_group_end = ++regex_itr;
           memset(transition_buffer, true, sizeof(transition_buffer));
+          break;
         }
         default: {
           subexpr_group_begin = regex_itr;
@@ -372,7 +375,8 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
       int quantification_length = quant.quantifyOnString(regex_itr);
 
       // Recursive call on a grouped subexpression
-      if (quantification_length != 0 && regex_itr != regex_group_end) {
+      if ((quantification_length != 0 && regex_itr != regex_group_end) || 
+          non_qualified_group) {
         next_state_set = addExprGroup(subexpr_group_begin,
                                       subexpr_group_end,
                                       current_state_set,
@@ -381,8 +385,7 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
 
         regex_itr += quantification_length;
         write_state = next_state_set[0];
-      }
-      else { // Otherwise do ordinary state transition writes
+      } else { // Otherwise do ordinary state transition writes
 
         bool reusable_existing_state = true;
         for (unsigned char i = 0;
@@ -421,21 +424,25 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
         last_group_in_expr = true;
       }
 
-      if (last_group_in_expr &&
-          occurrence_count == grp_quantification.min_occurrences &&
-          grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES)  {
-        // add epsilon transition to the previous cycle write state
-        addEpsilonTransition(cycle_state, write_state);
-        group_final_state_set.push_back(cycle_state);
-      } else if (last_group_in_expr &&
-          occurrence_count >= grp_quantification.min_occurrences) {
-        // next_state_set are accept states
-        for (auto accept_state : next_state_set) {
-          group_final_state_set.push_back(accept_state);
+      if (last_group_in_expr) {
+        if (occurrence_count == grp_quantification.min_occurrences &&
+          grp_quantification.max_occurrences == grp_quantification.INFINITE_OCCURRENCES) {
+
+          // add epsilon transition to the previous cycle write state
+          addEpsilonTransition(intermediate_state, write_state);
+          group_final_state_set.push_back(intermediate_state);
+
+        } else {
+          if (intermediate_state == garbage_state) {
+            intermediate_state = makeState();
+          }
+          
+          addEpsilonTransition(intermediate_state, write_state);
         }
       }
     }
   }
+  group_final_state_set.push_back(intermediate_state);
 
   for (auto state : next_state_set) {
 	  group_final_state_set.push_back(state);
