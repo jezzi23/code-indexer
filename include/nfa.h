@@ -1,5 +1,11 @@
 
+#ifndef NFA_H_
+#define NFA_H_
+
 #include <vector>
+#include <cstring>
+#include <iostream>
+#include <algorithm>
 
 #include "finite_automata.h"
 #include "regex.h"
@@ -39,35 +45,40 @@ private:
 
 //NFA TEMPLATE DEFINTIONS
 
-template <typename S, typename T, size_t a_size>
-NFA<S, T, a_size>::NFA() : FiniteAutomata {nullptr, nullptr, 2, 10} { // 1,10
-  transition_table =
-    static_cast<S(*)[a_size]>(operator new(num_states_max * sizeof(*transition_table)));
-  memset(transition_table + garbage_state, 0, sizeof(*transition_table)); 
-  memset(transition_table + begin_state,   0, sizeof(*transition_table)); 
+// Note: Since FiniteAutomata<S,T,a_size> is a nondependent class.
+//       Derived classes must explicitly refer to FiniteAutomata's
+//       data fields with the a dependent scope (e.g. this->...)
+// --->  "https://isocpp.org/wiki/faq/templates#nondependent-name-lookup-members 
 
-  accept_states =
-    static_cast<T*>(operator new(num_states_max * sizeof(*accept_states)));
-  accept_states[garbage_state] = accept_states[begin_state] = 0;  
+template <typename S, typename T, size_t a_size>
+NFA<S, T, a_size>::NFA() : FiniteAutomata<S, T, a_size> {nullptr, nullptr, 2, 10} {
+  this->transition_table =
+    static_cast<S(*)[a_size]>(operator new(this->num_states_max * sizeof(*this->transition_table)));
+  memset(this->transition_table + garbage_state, 0, sizeof(*this->transition_table)); 
+  memset(this->transition_table + begin_state,   0, sizeof(*this->transition_table)); 
+
+  this->accept_states =
+    static_cast<T*>(operator new(this->num_states_max * sizeof(*this->accept_states)));
+  this->accept_states[garbage_state] = this->accept_states[begin_state] = 0;  
   
-  epsilon_transitions = 
-    static_cast<std::vector<S>*>(operator new(num_states_max * sizeof(*epsilon_transitions)));    
+  this->epsilon_transitions = 
+    static_cast<std::vector<S>*>(operator new(this->num_states_max * sizeof(*this->epsilon_transitions)));    
    
-  new (epsilon_transitions + garbage_state) std::vector<S>();
-  new (epsilon_transitions + begin_state)   std::vector<S>();
+  new (this->epsilon_transitions + garbage_state) std::vector<S>();
+  new (this->epsilon_transitions + begin_state)   std::vector<S>();
 
   writeUnusedDefaultTransitions();
 }
 
 template <typename S, typename T, size_t a_size>
 NFA<S, T, a_size>::~NFA() {
-  operator delete(transition_table);
-  operator delete(accept_states);
+  operator delete(this->transition_table);
+  operator delete(this->accept_states);
   
-  for (unsigned int i = 0; i < num_states; ++i) {
-    epsilon_transitions[i].~vector<S>();
+  for (unsigned int i = 0; i < this->num_states; ++i) {
+    this->epsilon_transitions[i].~vector();
   }
-  operator delete(epsilon_transitions);
+  operator delete(this->epsilon_transitions);
 }
 
 template <typename S, typename T, size_t a_size>
@@ -79,67 +90,67 @@ const S NFA<S, T, a_size>::begin_state = NFA<S, T, a_size>::garbage_state + 1;
 template <typename S, typename T, size_t a_size>
 S
 NFA<S, T, a_size>::transition(S in_state, char in_ch) {
-  return transition_table[in_state][in_ch];  
+  return this->transition_table[in_state][in_ch];  
 }
 
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::writeTransition(S out_state, S in_state, char in_ch) {
-  transition_table[in_state][in_ch] = out_state;
+  this->transition_table[in_state][in_ch] = out_state;
 }
 
 template <typename S, typename T, size_t a_size>
 T NFA<S, T, a_size>::stateType(S state) {
-  return accept_states[state];
+  return this->accept_states[state];
 }
 
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::writeStateType(S state, T type) {
-  accept_states[state] = type;
+  this->accept_states[state] = type;
 }
 
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::addEpsilonTransition(S out_state, S in_state) {
-  epsilon_transitions[in_state].push_back(out_state);
+  this->epsilon_transitions[in_state].push_back(out_state);
 }
 
 template <typename S, typename T, size_t a_size>
 S
 NFA<S, T, a_size>::makeState() {
-  if (num_states >= num_states_max) {
+  if (this->num_states >= this->num_states_max) {
     grow();
   }
-  new (epsilon_transitions + num_states) std::vector<S>();
-  return num_states++;
+  new (this->epsilon_transitions + this->num_states) std::vector<S>();
+  return this->num_states++;
 }
 
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::grow() {
-  num_states_max <<= 1;
+  this->num_states_max <<= 1;
 
   S (*new_transition_table)[a_size] =
-    static_cast<S(*)[a_size]>(operator new(num_states_max * sizeof(*new_transition_table)));
+    static_cast<S(*)[a_size]>(operator new(this->num_states_max * sizeof(*new_transition_table)));
 
   T* new_accept_states =
-    static_cast<T*>(operator new(num_states_max * sizeof(*new_accept_states)));
+    static_cast<T*>(operator new(this->num_states_max * sizeof(*new_accept_states)));
 
   std::vector<S>* new_epsilon_transitions =
-    static_cast<std::vector<S>*>(operator new(num_states_max * sizeof(*new_epsilon_transitions)));
+    static_cast<std::vector<S>*>(operator new(this->num_states_max * sizeof(*new_epsilon_transitions)));
   
-  memcpy(new_transition_table, transition_table, sizeof(*transition_table) * num_states);
-  memcpy(new_accept_states, accept_states, sizeof(*accept_states) * num_states);
-  memcpy(new_epsilon_transitions, epsilon_transitions, sizeof(*epsilon_transitions) * num_states);
+  memcpy(new_transition_table, this->transition_table, sizeof(*this->transition_table) * this->num_states);
+  memcpy(new_accept_states, this->accept_states, sizeof(*this->accept_states) * this->num_states);
+  memcpy(new_epsilon_transitions, epsilon_transitions, sizeof(*epsilon_transitions) * this->num_states);
 
-  operator delete(transition_table);
-  operator delete(accept_states);
-  operator delete(epsilon_transitions);
+  operator delete(this->transition_table);
+  operator delete(this->accept_states);
+  operator delete(this->epsilon_transitions);
   
-  transition_table = new_transition_table;
-  accept_states = new_accept_states;
-  epsilon_transitions = new_epsilon_transitions;
+  this->transition_table = new_transition_table;
+  this->accept_states = new_accept_states;
+  this->epsilon_transitions = new_epsilon_transitions;
 
   writeUnusedDefaultTransitions();
 }
@@ -147,13 +158,13 @@ NFA<S, T, a_size>::grow() {
 template <typename S, typename T, size_t a_size>
 void
 NFA<S, T, a_size>::writeUnusedDefaultTransitions() {
-  memset(transition_table + num_states,
+  memset(this->transition_table + this->num_states,
          0,
-         (num_states_max - num_states) * sizeof(*transition_table));
+         (this->num_states_max - this->num_states) * sizeof(*this->transition_table));
 
-  memset(accept_states + num_states,
+  memset(this->accept_states + this->num_states,
          0,
-         (num_states_max - num_states) * sizeof(*accept_states));
+         (this->num_states_max - this->num_states) * sizeof(*this->accept_states));
 }
 
 template <typename S, typename T, size_t a_size>
@@ -442,14 +453,14 @@ NFA<S, T, a_size>::epsilonSearch(std::vector<S>& base_states) {
   }
   for (auto state : base_states) {
     /*
-    Why is dereferencing epsilon_transitions[state] through foreach an error...?!
-    for (auto epsilson_state : epsilon_transitions[state]) {
+    Why is dereferencing this->epsilon_transitions[state] through foreach an error...?!
+    for (auto epsilson_state : this->epsilon_transitions[state]) {
       expanded_states.push_back(epsilson_state);
     }
     */
-    const size_t n = epsilon_transitions[state].size();
+    const size_t n = this->epsilon_transitions[state].size();
     for (size_t i = 0; i < n; ++i) {
-      S transition = epsilon_transitions[state][i];
+      S transition = this->epsilon_transitions[state][i];
       if (std::find(expanded_states.begin(), expanded_states.end(), transition) ==
           expanded_states.end()) {
         expanded_states.push_back(transition);
@@ -458,4 +469,6 @@ NFA<S, T, a_size>::epsilonSearch(std::vector<S>& base_states) {
   }
   return expanded_states;
 }
+
+#endif // NFA_H_
 

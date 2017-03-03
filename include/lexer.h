@@ -6,7 +6,7 @@
 
 #include "types.h"
 #include "nfa.h"
-#include "dfa.h"
+//#include "dfa.h"
 
 // The regular expression documentation used by the lexer can be found in regex.h
 // 
@@ -72,7 +72,7 @@ private:
   // Lexer internally constructs NFA during build phase
   // which gets replaced with a DFA for lexing phase.
   union {
-    DFA<unsigned int, int, 1 << 7>* dfa;
+//    DFA<unsigned int, int, 1 << 7>* dfa;
     NFA<unsigned int, int, 1 << 7>* nfa;
   };
 };

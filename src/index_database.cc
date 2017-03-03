@@ -14,5 +14,5 @@ void DataBase::load() {
 }
 
 void DataBase::release() {
-  file_mapper.unmap(file_begin);
+  file_mapper.unmap(file_begin, HEADER_LAST);
 }

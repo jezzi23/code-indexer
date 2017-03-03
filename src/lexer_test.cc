@@ -41,7 +41,7 @@ int main(int argc, char* args[]) {
   lexer.addRule("[0-9]+", INTEGER_NUM);
   lexer.addRule("[a-zA-Z_]+", NAME);
   lexer.addRule("{|}|\\(|\\)|,|;|\\[|\\]|<|>|\\.", DELIMITER);
-  lexer.addRule("\n|\r|\t| ", WHITE_SPACE_FOOD);
+  //lexer.addRule("\n|\r|\t| ", WHITE_SPACE_FOOD);
 
   lexer.build();
 
@@ -65,6 +65,8 @@ int main(int argc, char* args[]) {
       file_begin + token.index);
   }
   printf("%d occurrences", count);
+  
+  filemap.unmap(const_cast<char*>(file_begin), file_size);
 
   return EXIT_SUCCESS;
 }

@@ -80,7 +80,7 @@ void* FileMapper::map(u64 byte_offset, u32 length) {
   return result;
 }
 
-void FileMapper::unmap(void* mapped_mem) {
+void FileMapper::unmap(void* mapped_mem, u32 length) {
   BOOL success = UnmapViewOfFile(mapped_mem);
   if (!success) {
     std::cerr << "Unmapping file from memory failed: ";

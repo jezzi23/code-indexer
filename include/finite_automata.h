@@ -2,6 +2,7 @@
 #ifndef FINITE_AUTOMATA_H_
 #define FINITE_AUTOMATA_H_
 
+#include <cstring>
 #include <limits>
 
 // FiniteAutomata is a finite state machine that knows nothing about how it's built or used.

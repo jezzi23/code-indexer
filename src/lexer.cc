@@ -41,6 +41,9 @@ Lexer::~Lexer() {
 //      dfa->~DFA();
       break;
     }
+    default: {
+      break;
+    }
   }
 }
 
@@ -125,9 +128,7 @@ Lexer::nextToken() {
       ++lexing_data.line_count;
       lexing_data.last_line_begin = lexing_data.itr;
     }
-	if (isdigit(*lexing_data.itr)) {
-		int breakme = 5;
-	}
+
     // branch out before to all epsilon transitions stored in current_state_set
     current_state_set = nfa->epsilonSearch(current_state_set);
     std::vector<unsigned int> next_state_set;
@@ -139,9 +140,7 @@ Lexer::nextToken() {
     }
     // branch out after
     current_state_set = nfa->epsilonSearch(next_state_set);
-    if (*lexing_data.itr == 'f') {
-      int breakme = 5;
-    }
+
     ++lexing_data.itr;
 
     bool is_non_garbage_set = false;
@@ -150,7 +149,7 @@ Lexer::nextToken() {
         is_non_garbage_set = true;
       }
       const int state_type = nfa->stateType(current_state);
-      if (state_type != 0) {
+      if (state_type != nfa->garbage_state) {
         if (governing_token != 0 && governing_token != state_type) {
           std::cout << "Overwriting token state from ";
           std::cout << governing_token << " to (" << state_type << std::endl;
@@ -162,14 +161,15 @@ Lexer::nextToken() {
     if (is_non_garbage_set) {
       if (governing_token != 0) {
         longest_match_so_far = Token(lexing_data, governing_token);
-        after_token_match_lexing_state = {lexing_data.begin,
-                                          lexing_data.itr + 1,
-                                          lexing_data.end,
-                                          lexing_data.last_line_begin,
-                                          lexing_data.line_count,
-                                          lexing_data.itr + 1,
-                                          lexing_data.line_count,
-                                          (lexing_data.itr - lexing_data.last_line_begin) + 1u};
+        after_token_match_lexing_state = {
+            lexing_data.begin, 
+            lexing_data.itr + 1, 
+            lexing_data.end, 
+            lexing_data.last_line_begin, 
+            lexing_data.line_count, 
+            lexing_data.itr + 1, 
+            lexing_data.line_count, 
+            static_cast<unsigned int>(lexing_data.itr - lexing_data.last_line_begin + 1)};
       }
     } else {
       if (longest_match_so_far.id != 0) {
