@@ -36,11 +36,14 @@ int main(int argc, char* args[]) {
   };
 
   // Example rules
-  lexer.addRule("/\\*(\\*[^/]|[^*])*\\*/", COMMENT);
-  lexer.addRule("[0-9]*\\.[0-9]+", FLOAT_NUM);
-  lexer.addRule("[0-9]+", INTEGER_NUM);
-  lexer.addRule("[a-zA-Z_]+", NAME);
-  lexer.addRule("{|}|\\(|\\)|,|;|\\[|\\]|<|>|\\.", DELIMITER);
+  // Note: string literals prefixed with R to indicate a raw string
+  //       as standardized in C++11
+
+  lexer.addRule(R"(/\*(\*[^/]|[^*])*\*/)", COMMENT);
+  lexer.addRule(R"([0-9]*\.[0-9]+)", FLOAT_NUM);
+  lexer.addRule(R"([0-9]+)", INTEGER_NUM);
+  lexer.addRule(R"([a-zA-Z_]+)", NAME);
+  lexer.addRule(R"({|}|\(|\)|,|;|\[|\]|<|>|\.)", DELIMITER);
   //lexer.addRule("\n|\r|\t| ", WHITE_SPACE_FOOD);
 
   lexer.build();
