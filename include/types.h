@@ -4,8 +4,6 @@
 
 #include <cstdint>
 
-// Static has way too many meanings in different contexts
-// Why not use "internal_" to imply internal linkage?
 #define internal_ static
 
 typedef std::int8_t   s8;

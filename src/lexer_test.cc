@@ -36,8 +36,7 @@ int main(int argc, char* args[]) {
   };
 
   // Example rules
-  // Note: string literals prefixed with R to indicate a raw string
-  //       as standardized in C++11
+  // Note: C++11 raw string is useful for regex descriptions.
 
   lexer.addRule(R"(/\*(\*[^/]|[^*])*\*/)", COMMENT);
   lexer.addRule(R"([0-9]*\.[0-9]+)", FLOAT_NUM);
@@ -50,24 +49,25 @@ int main(int argc, char* args[]) {
 
   Token token;
   int count = 0;
+
   for (;;) {
+
     token = lexer.nextToken();
     if (token.id == END_OF_FILE) {
-      printf("%s\n", "EOF reached");
+      std::cout << "EOF reached" << std::endl;
       break;
     }
     count++;
 
-    printf("Token.\nIndex: %d\nLength: %d\nTokenId: %d\nline_count: %d\nColumn_count: %d\nContents:\n%.*s\n\n",
-      (int)token.index,
-      (int)token.length,
-      (int)token.id,
-      (int)token.line_count,
-      (int)token.column_count,
-      (int)token.length,
-      file_begin + token.index);
+    std::cout << "Token found."                       << '\n';
+    std::cout << "Index:\t"     << token.index        << '\n';
+    std::cout << "Length:\t"    << token.length       << '\n';
+    std::cout << "Id:\t"        << token.id           << '\n';
+    std::cout << "Line:\t"      << token.line_count   << '\n';
+    std::cout << "Column:\t"    << token.column_count << std::endl;
+    printf("Contents:\n%.*s\n\n", token.length, file_begin + token.index);
   }
-  printf("%d occurrences", count);
+  std::cout << "%d Total occurrences: " << count << std::endl;
   
   filemap.unmap(const_cast<char*>(file_begin), file_size);
 
