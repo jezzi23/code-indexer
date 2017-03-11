@@ -11,6 +11,38 @@
 #include "finite_automata.h"
 #include "utils.h"
 
+internal_ inline void resolveLineTracking(LexingIterator& lex_data); 
+internal_ inline void setTokenStartAsNext(LexingIterator& lex_data); 
+internal_ inline void setTokenStartAsCurrent(LexingIterator& lex_data); 
+
+void
+resolveLineTracking(LexingIterator& lex_data) {
+  if (*lex_data.itr == '\n') {
+    ++lex_data.line_count;
+    lex_data.last_line_begin = lex_data.itr;
+  }
+}
+
+void
+setTokenStartAsNext(LexingIterator& lex_data) {
+  lex_data.token_begin = lex_data.itr + 1;
+  lex_data.token_line = lex_data.line_count;
+
+  if (*lex_data.token_begin != '\n') {
+    lex_data.token_column = lex_data.token_begin - lex_data.last_line_begin;
+  } else {
+    ++lex_data.token_line;
+    lex_data.token_column = 0;
+  }
+}
+
+void
+setTokenStartAsCurrent(LexingIterator& lex_data) {
+  lex_data.token_begin = lex_data.itr;
+  lex_data.token_line = lex_data.line_count;
+  lex_data.token_column = lex_data.token_begin - lex_data.last_line_begin;
+}
+
 Token::Token() {
 
 }
@@ -117,33 +149,25 @@ Lexer::nextToken() {
 Token
 Lexer::nextToken() {
   assert(status == LexingState::QUERY_PHASE);
+  std::vector<unsigned int> tmp_set;
   std::vector<unsigned int> current_state_set = {nfa->begin_state};
+  current_state_set = nfa->epsilonSearch(current_state_set);
   // Save state of longest match so far of token and lexing_state
   Token longest_match_so_far;
   longest_match_so_far.id = 0;
-  LexingIterator after_token_match_lexing_state;
-  
 
-  while (lexing_data.itr != lexing_data.end) {
-    if (*lexing_data.itr == '\n') {
-      ++lexing_data.line_count;
-      lexing_data.last_line_begin = lexing_data.itr;
-    }
+  // Can rewind to lexing state after last token match or to simply skip
+  // meaningless characters
+  // TODO: Might have to deal with line increments here
+  LexingIterator rewind_lexing_state = lexing_data;
+  resolveLineTracking(rewind_lexing_state);
+  setTokenStartAsNext(rewind_lexing_state);
 
-    // branch out before to all epsilon transitions stored in current_state_set
-    current_state_set = nfa->epsilonSearch(current_state_set);
-    std::vector<unsigned int> next_state_set;
-    for (auto current_state : current_state_set) {
-      unsigned int transition_state = nfa->transition(current_state,
-                                                      *lexing_data.itr);
-      if (transition_state != nfa->garbage_state) {
-        next_state_set.push_back(transition_state);
-      }
-    }
-    // branch out after
-    current_state_set = nfa->epsilonSearch(next_state_set);
+  for (;
+       lexing_data.itr != lexing_data.end;
+       ++lexing_data.itr) {
 
-    ++lexing_data.itr;
+    resolveLineTracking(lexing_data);
 
     bool is_garbage_set = true;
     int governing_token = 0;
@@ -158,35 +182,41 @@ Lexer::nextToken() {
       }
     }
 
-    if (!is_garbage_set) {
-      if (governing_token != 0) {
-        longest_match_so_far = Token(lexing_data, governing_token);
-        after_token_match_lexing_state = {
-            lexing_data.begin, 
-            lexing_data.itr, 
-            lexing_data.end, 
-            lexing_data.last_line_begin, 
-            lexing_data.line_count, 
-            lexing_data.itr,
-            lexing_data.line_count, 
-            static_cast<unsigned int>(
-              lexing_data.itr - lexing_data.last_line_begin + 1)};
-      }
-    } else {
+    if (is_garbage_set) {
       if (longest_match_so_far.id != 0) {
         // rewind back to where the token was found
-        lexing_data = after_token_match_lexing_state;
+        lexing_data = rewind_lexing_state;
         return longest_match_so_far;
+
       } else {
-        lexing_data.token_begin = lexing_data.itr;
-        lexing_data.token_line = lexing_data.line_count;
-        lexing_data.token_column =
-          lexing_data.itr - lexing_data.last_line_begin;
+        lexing_data = rewind_lexing_state;
+        ++rewind_lexing_state.itr;
+        resolveLineTracking(rewind_lexing_state);
+        setTokenStartAsNext(rewind_lexing_state);
 
         current_state_set.clear();
         current_state_set.push_back(nfa->begin_state);
+        current_state_set = nfa->epsilonSearch(current_state_set);
+
+        continue;
+      }
+    } else if (governing_token != 0){
+      longest_match_so_far = Token(lexing_data, governing_token);
+      // set rewind state to continue after where token ends
+      rewind_lexing_state = lexing_data;
+      setTokenStartAsCurrent(rewind_lexing_state);
+    }
+
+    tmp_set.clear();
+    for (auto current_state : current_state_set) {
+      unsigned int transition_state = nfa->transition(current_state,
+                                                      *lexing_data.itr);
+      if (transition_state != nfa->garbage_state) {
+        tmp_set.push_back(transition_state);
       }
     }
+    // branch out after
+    current_state_set = nfa->epsilonSearch(tmp_set);
   }
 
   return Token(lexing_data, -52); // will be end of file (EOF)

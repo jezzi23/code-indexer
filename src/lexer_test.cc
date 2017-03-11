@@ -57,6 +57,7 @@ int main(int argc, char* args[]) {
       std::cout << "EOF reached" << std::endl;
       break;
     }
+
     count++;
 
     std::cout << "Token found."                       << '\n';
