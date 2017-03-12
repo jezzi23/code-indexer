@@ -164,7 +164,9 @@ Lexer::nextToken() {
   setTokenStartAsNext(rewind_lexing_state);
 
   for (;
-       lexing_data.itr != lexing_data.end;
+       lexing_data.itr != lexing_data.end ||
+       rewind_lexing_state.itr != lexing_data.itr;
+
        ++lexing_data.itr) {
 
     resolveLineTracking(lexing_data);

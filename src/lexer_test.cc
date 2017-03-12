@@ -38,9 +38,12 @@ int main(int argc, char* args[]) {
   // Example rules
   // Note: C++11 raw string is useful for regex descriptions.
 
+  // C-style comment
   lexer.addRule(R"(/\*(\*[^/]|[^*])*\*/)", COMMENT);
-  lexer.addRule(R"([0-9]*\.[0-9]+)", FLOAT_NUM);
-  lexer.addRule(R"([0-9]+)", INTEGER_NUM);
+  // Floating point literals may be suffixed with f or l
+  lexer.addRule(R"([0-9]*\.[0-9]+[FfLl])", FLOAT_NUM);
+  // Integer literals may be suffixed with u and l or ll may follow
+  lexer.addRule(R"([0-9]+[Uu]?[Ll]{,2})", INTEGER_NUM);
   lexer.addRule(R"([a-zA-Z_]+)", NAME);
   lexer.addRule(R"({|}|\(|\)|,|;|\[|\]|<|>|\.)", DELIMITER);
   //lexer.addRule("\n|\r|\t| ", WHITE_SPACE_FOOD);

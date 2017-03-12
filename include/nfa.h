@@ -253,7 +253,11 @@ NFA<S, T, a_size>::addExprGroup(const char* regex_group_begin,
       // The current state set will be used for cycle connectivity
       intermediate_state = write_state;
     } else if (occurrence_count >= grp_quantification.min_occurrences) {
-      group_final_state_set.push_back(write_state);
+      if (intermediate_state == garbage_state) {
+        intermediate_state = makeState();
+      }
+
+      addEpsilonTransition(intermediate_state, write_state);
     }
     
     for (const char* regex_itr = regex_group_begin;
