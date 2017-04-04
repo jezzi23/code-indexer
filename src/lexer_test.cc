@@ -6,7 +6,7 @@
 #include "lexer.h"
 #include "index_database.h"
 #include "file_mapped_io.h"
-
+#include "cpp_lexer.h"
 
 // args[1]: filename to be lexed
 int main(int argc, char* args[]) {
@@ -21,60 +21,19 @@ int main(int argc, char* args[]) {
 
   const char* file_begin = static_cast<const char*>(filemap.map(0, file_size));
   const char* file_end = file_begin + file_size;
-
-  Lexer lexer(file_begin, file_end);
-
-  enum {
-    OCCUPIED = 0,
-    WHITE_SPACE_FOOD,
-    INTEGER_NUM,
-    FLOAT_NUM,
-    NAME,
-    COMMENT,
-    DELIMITER,
-    END_OF_FILE = -52
-  };
-
-  // Example rules
-  // Note: C++11 raw string is useful for regex descriptions.
-
-  // C-style comment
-  lexer.addRule(R"(/\*(\*[^/]|[^*])*\*/)", COMMENT);
-  // Floating point literals may be suffixed with f or l
-  lexer.addRule(R"([0-9]*\.[0-9]+[FfLl])", FLOAT_NUM);
-  // Integer literals may be suffixed with u and l or ll may follow
-  lexer.addRule(R"([0-9]+[Uu]?[Ll]{,2})", INTEGER_NUM);
-  lexer.addRule(R"([a-zA-Z_]+)", NAME);
-  lexer.addRule(R"({|}|\(|\)|,|;|\[|\]|<|>|\.)", DELIMITER);
-  //lexer.addRule("\n|\r|\t| ", WHITE_SPACE_FOOD);
-
-  lexer.build();
-
-  Token token;
-  int count = 0;
-
-  for (;;) {
-
-    token = lexer.nextToken();
-    if (token.id == END_OF_FILE) {
-      std::cout << "EOF reached" << std::endl;
-      break;
-    }
-
-    count++;
-
-    std::cout << "Token found."                       << '\n';
-    std::cout << "Index:\t"     << token.index        << '\n';
-    std::cout << "Length:\t"    << token.length       << '\n';
-    std::cout << "Id:\t"        << token.id           << '\n';
-    std::cout << "Line:\t"      << token.line_count   << '\n';
-    std::cout << "Column:\t"    << token.column_count << std::endl;
-    printf("Contents:\n%.*s\n\n", token.length, file_begin + token.index);
-  }
-  std::cout << "%d Total occurrences: " << count << std::endl;
   
-  filemap.unmap(const_cast<char*>(file_begin), file_size);
+  // Build cpp lexing ruleset
+  buildCppLexer();
+  // Feed our file data stream
+  feedLexer(file_begin, file_end); 
 
+  // Test calls
+  lexerTestPrintAllTokens();
+  lexerTestPrintAllFunctionsCalledInFunctions();
+
+  // Cleanup
+  filemap.unmap(const_cast<char*>(file_begin), file_size);
+  
   return EXIT_SUCCESS;
 }
 

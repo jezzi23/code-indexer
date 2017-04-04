@@ -43,6 +43,7 @@ setTokenStartAsCurrent(LexingIterator& lex_data) {
   lex_data.token_column = lex_data.token_begin - lex_data.last_line_begin;
 }
 
+
 Token::Token() {
 
 }
@@ -56,10 +57,7 @@ Token::Token(LexingIterator lex_itr, int token_id) :
 
 }
 
-Lexer::Lexer(const char* lexing_data_begin, const char* lexing_data_end) :
-    lexing_data{lexing_data_begin, lexing_data_begin, lexing_data_end,
-                lexing_data_begin - 1, 1,
-                lexing_data_begin, 1, 1},
+Lexer::Lexer() :
     status(LexingState::INITIALIZATION_PHASE),
     nfa(nullptr) {
 
@@ -114,6 +112,18 @@ Lexer::build() {
   status = LexingState::QUERY_PHASE;
 }
 
+void
+Lexer::setStream(const char* input_data_begin, const char* input_data_end) {
+  lexing_data = {input_data_begin, input_data_begin, input_data_end,
+                 input_data_begin - 1, 1,
+                 input_data_begin, 1, 1};
+}
+
+const char*
+Lexer::begin() {
+  return lexing_data.begin;
+}
+
 /*
 DFA querying will look something like this 
 
@@ -156,19 +166,34 @@ Lexer::nextToken() {
   Token longest_match_so_far;
   longest_match_so_far.id = 0;
 
+
   // Can rewind to lexing state after last token match or to simply skip
   // meaningless characters
   // TODO: Might have to deal with line increments here
   LexingIterator rewind_lexing_state = lexing_data;
-  resolveLineTracking(rewind_lexing_state);
+    if (rewind_lexing_state.token_line == 52) {
+      int breakme = 5;
+    }
   setTokenStartAsNext(rewind_lexing_state);
 
   for (;
-       lexing_data.itr != lexing_data.end ||
-       rewind_lexing_state.itr != lexing_data.itr;
-
+       ;
        ++lexing_data.itr) {
 
+    if (lexing_data.itr == lexing_data.end) {
+      if (rewind_lexing_state.itr < lexing_data.itr) {
+
+        rewindBackTo(rewind_lexing_state, current_state_set);
+        continue;
+
+      } else {
+        break;
+      }
+    }
+    
+    if (lexing_data.line_count == 124) {
+      int breakme = 5;
+    }
     resolveLineTracking(lexing_data);
 
     bool is_garbage_set = true;
@@ -191,15 +216,8 @@ Lexer::nextToken() {
         return longest_match_so_far;
 
       } else {
-        lexing_data = rewind_lexing_state;
-        ++rewind_lexing_state.itr;
-        resolveLineTracking(rewind_lexing_state);
-        setTokenStartAsNext(rewind_lexing_state);
 
-        current_state_set.clear();
-        current_state_set.push_back(nfa->begin_state);
-        current_state_set = nfa->epsilonSearch(current_state_set);
-
+        rewindBackTo(rewind_lexing_state, current_state_set);
         continue;
       }
     } else if (governing_token != 0){
@@ -234,3 +252,17 @@ Lexer::rewind() {
   lexing_data.line_count = 1;
 }
 
+void
+Lexer::rewindBackTo(LexingIterator& rewind_data,
+                    std::vector<unsigned int>& state_set) {
+  
+  lexing_data = rewind_data;
+  ++rewind_data.itr;
+  resolveLineTracking(rewind_data);
+  setTokenStartAsNext(rewind_data);
+
+  state_set.clear();
+  state_set.push_back(nfa->begin_state);
+  state_set = nfa->epsilonSearch(state_set);
+
+}

@@ -47,15 +47,20 @@ public:
 
 class Lexer {
 public:
-  Lexer(const char* input_data_begin, const char* input_data_end);
+  Lexer();
   ~Lexer();
   
   void addRule(const Regexpr regexpr, int token_id);
   void build();
 
+  void setStream(const char* input_data_begin, const char* input_data_end);
+  const char* begin();
+  
   Token nextToken();
   void rewind();  
 private:
+  void rewindBackTo(LexingIterator& rewind_data, std::vector<unsigned int>& state_set);
+
   LexingIterator lexing_data;
 
   enum class LexingState : u8 {
